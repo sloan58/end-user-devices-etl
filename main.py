@@ -23,8 +23,8 @@ offset = 0
 base_url = os.getenv('PALO_BASE_API') + '/pub/v4.0/device/list'
 
 headers = {
-    'X-Key-Id': 'api_key_id',
-    'X-Access-Key': 'api_access_key',
+    'X-Key-Id': os.getenv('PALO_API_KEY_ID'),
+    'X-Access-Key': os.getenv('PALO_API_ACCESS_KEY'),
 }
 
 while True:
