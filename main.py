@@ -13,10 +13,11 @@ user = os.getenv('PYMSSQL_USERNAME')
 password = os.getenv('PYMSSQL_PASSWORD')
 db = os.getenv('PYMSSQL_DB')
 
-customer_id = os.getenv('PALO_CUSTOMER_ID')
-
 conn = pymssql.connect(server, user, password, db, autocommit=True)
 cursor = conn.cursor(as_dict=True)
+
+customer_id = os.getenv('PALO_CUSTOMER_ID')
+table = os.getenv('PALO_TABLE_NAME')
 
 offset = 0
 
@@ -26,6 +27,22 @@ headers = {
     'X-Key-Id': os.getenv('PALO_API_KEY_ID'),
     'X-Access-Key': os.getenv('PALO_API_ACCESS_KEY'),
 }
+
+db_ints = [
+    'pkey',
+    'risk_score',
+    'number_of_critical_alerts',
+    'number_of_warning_alerts',
+    'number_of_caution_alerts',
+    'number_of_info_alerts',
+    'zone',
+]
+
+db_json = [
+    'tags',
+    'attr',
+    'allTags',
+]
 
 while True:
     url = base_url + f'?offset={offset}&pagelength=1000&detail=true&customerid={customer_id}'
@@ -42,11 +59,40 @@ while True:
 
     items = response.json() or []
 
-    payload = list(map(lambda item: ('testing3', json.dumps(item)), items['devices']))
+    fields = ','.join(([','.join(f'[{str(val)}]' for val in items['data'][0].keys())]))
 
-    cursor.executemany('INSERT INTO test_pymssql(stringValue, jsonValue) VALUES (%s, %s)', payload)
+    all_rows = []
+    for item in items['data']:
+        row = []
+        for key, val in item.items():
+            if key in db_ints:
+                row.append(f"{int(val)}")
+            elif key in db_json:
+                json = val.replace("\'", "\"")
+                row.append(f"'{json}'")
+            else:
+                row.append(f"'{str(val)}'")
+        all_rows.append(f"({','.join(row)})")
 
-    if len(payload) < 1000:
+    all_rows = ','.join(all_rows)
+    update_assignments = ','.join(([','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['data'][0].keys())]))
+    dynamic_content = {
+        'table': table,
+        'fields': fields,
+        'all_rows': all_rows,
+        'update_assignments': update_assignments
+    }
+
+    statement = '''merge [{table}] using (values {all_rows}) [script_source] ({fields})
+        on [script_source].[pkey] = [{table}].[pkey]
+        when matched then update set {update_assignments}
+        when not matched then insert ({fields})
+        values ({fields});
+    '''.format(**dynamic_content)
+
+    cursor.execute(statement)
+
+    if len(items['data']) < 1000:
         break
 
     offset += 1000
