@@ -59,7 +59,7 @@ while True:
     items = response.json() or []
 
     all_rows = []
-    for item in items['data']:
+    for item in items['devices']:
         row = []
         for key, val in item.items():
             if key in db_ints:
@@ -72,8 +72,8 @@ while True:
         all_rows.append(f"({','.join(row)})")
 
     all_rows = ','.join(all_rows)
-    fields = ','.join(f'[{str(val)}]' for val in items['data'][0].keys())
-    update_assignments = ','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['data'][0].keys())
+    fields = ','.join(f'[{str(val)}]' for val in items['devices'][0].keys())
+    update_assignments = ','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['devices'][0].keys())
 
     dynamic_content = {
         'table': table,
