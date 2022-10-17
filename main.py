@@ -83,7 +83,7 @@ while True:
     }
 
     statement = '''merge [{table}] using (values {all_rows}) [script_source] ({fields})
-        on [script_source].[pkey] = [{table}].[pkey]
+        on [script_source].[MAC] = [{table}].[MAC]
         when matched then update set {update_assignments}
         when not matched then insert ({fields})
         values ({fields});
@@ -91,7 +91,7 @@ while True:
 
     cursor.execute(statement)
 
-    if len(items['data']) < 1000:
+    if len(items['devices']) < 1000:
         break
 
     offset += 1000
