@@ -59,8 +59,6 @@ while True:
 
     items = response.json() or []
 
-    fields = ','.join(([','.join(f'[{str(val)}]' for val in items['data'][0].keys())]))
-
     all_rows = []
     for item in items['data']:
         row = []
@@ -75,7 +73,9 @@ while True:
         all_rows.append(f"({','.join(row)})")
 
     all_rows = ','.join(all_rows)
-    update_assignments = ','.join(([','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['data'][0].keys())]))
+    fields = ','.join(f'[{str(val)}]' for val in items['data'][0].keys())
+    update_assignments = ','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['data'][0].keys())
+
     dynamic_content = {
         'table': table,
         'fields': fields,
