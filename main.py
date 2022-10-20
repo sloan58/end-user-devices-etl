@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -11,12 +12,13 @@ server = os.getenv('PYMSSQL_SERVER')
 user = os.getenv('PYMSSQL_USERNAME')
 password = os.getenv('PYMSSQL_PASSWORD')
 db = os.getenv('PYMSSQL_DB')
+table = os.getenv('PYMSSQL_TABLE')
 
 conn = pymssql.connect(server, user, password, db, autocommit=True)
 cursor = conn.cursor(as_dict=True)
 
 customer_id = os.getenv('PALO_CUSTOMER_ID')
-table = os.getenv('PALO_TABLE_NAME')
+page_length = os.getenv('PALO_PAGE_LENGTH')
 
 offset = 0
 
@@ -43,8 +45,57 @@ db_json = [
     'allTags',
 ]
 
+db_fields = [
+    'AD_Domain',
+    'AET',
+    'Access_Point_IP',
+    'Access_Point_Name',
+    'Applications',
+    'DHCP',
+    'MAC',
+    'Serial_Number',
+    'Switch_IP',
+    'Switch_Name',
+    'Switch_Port',
+    'allTags',
+    'attr',
+    'category',
+    'confidence_score',
+    'deviceid',
+    'endpoint_protection',
+    'endpoint_protection_vendor',
+    'first_seen_date',
+    'hostname',
+    'in_use',
+    'ip_address',
+    'last_activity',
+    'mac_address',
+    'model',
+    'number_of_caution_alerts',
+    'number_of_critical_alerts',
+    'number_of_info_alerts',
+    'number_of_warning_alerts',
+    'os_combined',
+    'os_firmware_version',
+    'os_group',
+    'producer',
+    'profile',
+    'profile_type',
+    'profile_vertical',
+    'risk_level',
+    'risk_score',
+    'services',
+    'site_name',
+    'source',
+    'subnet',
+    'tags',
+    'vendor',
+    'wire_or_wireless',
+    'zone'
+ ]
+
 while True:
-    url = base_url + f'?offset={offset}&pagelength=1000&detail=true&customerid={customer_id}'
+    url = base_url + f'?offset={offset}&pagelength={page_length}&detail=true&customerid={customer_id}'
 
     try:
         response = requests.request('GET', url, headers=headers)
@@ -56,24 +107,30 @@ while True:
         print(e, file=sys.stderr)
         sys.exit()
 
-    items = response.json() or []
+    try:
+        items = response.json()['devices']
+    except KeyError as e:
+        items = []
 
     all_rows = []
-    for item in items['devices']:
+    for item in items:
         row = []
-        for key, val in item.items():
-            if key in db_ints:
-                row.append(f"{int(val)}")
-            elif key in db_json:
-                json = val.replace("\'", "\"")
-                row.append(f"'{json}'")
+        for field in db_fields:
+            if field not in item.keys():
+                row.append(f"''")
+                continue
+            if field in db_ints:
+                row.append(f"{int(item[field])}")
+            elif field in db_json:
+                json_string = json.dumps(item[field]).replace("\'", "\"")
+                row.append(f"'{json_string}'")
             else:
-                row.append(f"'{str(val)}'")
+                row.append(f"'{str(item[field])}'")
         all_rows.append(f"({','.join(row)})")
 
     all_rows = ','.join(all_rows)
-    fields = ','.join(f'[{str(val)}]' for val in items['devices'][0].keys())
-    update_assignments = ','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in items['devices'][0].keys())
+    fields = ','.join(f'[{str(val)}]' for val in db_fields)
+    update_assignments = ','.join(f'[{str(val)}] = [script_source].[{str(val)}]' for val in db_fields)
 
     dynamic_content = {
         'table': table,
@@ -91,7 +148,7 @@ while True:
 
     cursor.execute(statement)
 
-    if len(items['devices']) < 1000:
+    if len(items) < int(page_length):
         break
 
-    offset += 1000
+    offset += int(page_length)
