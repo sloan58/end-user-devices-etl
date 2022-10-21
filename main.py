@@ -2,6 +2,7 @@ import json
 import os
 import sys
 
+import _mssql
 import pymssql
 import requests
 from dotenv import load_dotenv
@@ -14,8 +15,7 @@ password = os.getenv('PYMSSQL_PASSWORD')
 db = os.getenv('PYMSSQL_DB')
 table = os.getenv('PYMSSQL_TABLE')
 
-conn = pymssql.connect(server, user, password, db, autocommit=True)
-cursor = conn.cursor(as_dict=True)
+conn = pymssql.connect(server, user, password, db, autocommit=True, timeout=10)
 
 customer_id = os.getenv('PALO_CUSTOMER_ID')
 page_length = os.getenv('PALO_PAGE_LENGTH')
@@ -122,8 +122,7 @@ while True:
             if field in db_ints:
                 row.append(f"{int(item[field])}")
             elif field in db_json:
-                json_string = json.dumps(item[field]).replace("\'", "\"")
-                row.append(f"'{json_string}'")
+                row.append(f"'{json.dumps(item[field])}'")
             else:
                 row.append(f"'{str(item[field])}'")
         all_rows.append(f"({','.join(row)})")
@@ -146,7 +145,15 @@ while True:
         values ({fields});
     '''.format(**dynamic_content)
 
-    cursor.execute(statement)
+    with conn.cursor(as_dict=True) as cursor:
+        try:
+            cursor.execute(statement)
+        except pymssql.InterfaceError as e:
+            print(f'Exception (InterfaceError): {e}', file=sys.stderr)
+            sys.exit()
+        except pymssql.DatabaseError as e:
+            print(f'Exception (DatabaseError): {e}', file=sys.stderr)
+            sys.exit()
 
     if len(items) < int(page_length):
         break
