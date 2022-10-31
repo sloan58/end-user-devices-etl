@@ -1,7 +1,9 @@
+import asyncio
 import json
 import os
 import sys
 
+import aiohttp
 import pymssql
 import requests
 from dotenv import load_dotenv
@@ -18,10 +20,11 @@ conn = pymssql.connect(server, user, password, db, autocommit=True, timeout=10)
 
 customer_id = os.getenv('PALO_CUSTOMER_ID')
 page_length = os.getenv('PALO_PAGE_LENGTH')
+concurrency = int(os.getenv('PALO_CONCURRENCY'))
 
-offset = 0
-
+offset = -1
 base_url = os.getenv('PALO_BASE_API') + '/pub/v4.0/device/list'
+api_has_more_results = True
 
 headers = {
     'X-Key-Id': os.getenv('PALO_API_KEY_ID'),
@@ -93,24 +96,34 @@ db_fields = [
     'zone'
  ]
 
-while True:
-    url = base_url + f'?offset={offset}&pagelength={page_length}&detail=true&customerid={customer_id}'
 
-    try:
-        response = requests.request('GET', url, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        print(e, file=sys.stderr)
-        sys.exit()
-    except requests.exceptions.RequestException as e:
-        print(e, file=sys.stderr)
-        sys.exit()
+async def call_api(offset):
+    async with aiohttp.ClientSession() as session:
+        url = base_url + f'?offset={offset}&pagelength={page_length}&detail=true&customerid={customer_id}'
+        try:
+            response = await session.request('GET', url=url, headers=headers)
+            data = await response.json()
+            response.raise_for_status()
 
-    try:
-        items = response.json()['devices']
-    except KeyError as e:
-        items = []
+            try:
+                items = data['devices']
+            except (KeyError, TypeError) as e:
+                items = []
 
+            if len(items):
+                return store_data(items)
+            else:
+                return False
+        except requests.exceptions.HTTPError as e:
+            print(e, file=sys.stderr)
+            sys.exit()
+        except requests.exceptions.RequestException as e:
+            print(e, file=sys.stderr)
+            sys.exit()
+
+
+def store_data(items):
+    global api_has_more_results
     all_rows = []
     for item in items:
         row = []
@@ -138,11 +151,11 @@ while True:
     }
 
     statement = '''merge [{table}] using (values {all_rows}) [script_source] ({fields})
-        on [script_source].[MAC] = [{table}].[MAC]
-        when matched then update set {update_assignments}
-        when not matched then insert ({fields})
-        values ({fields});
-    '''.format(**dynamic_content)
+            on [script_source].[MAC] = [{table}].[MAC]
+            when matched then update set {update_assignments}
+            when not matched then insert ({fields})
+            values ({fields});
+        '''.format(**dynamic_content)
 
     with conn.cursor(as_dict=True) as cursor:
         try:
@@ -154,7 +167,21 @@ while True:
             print(f'Exception (DatabaseError): {e}', file=sys.stderr)
             sys.exit()
 
-    if len(items) < int(page_length):
-        break
+    return len(items) == int(page_length)
 
-    offset += int(page_length)
+
+async def main(offsets):
+    tasks = []
+    for offset in offsets:
+        tasks.append(asyncio.create_task(call_api(offset)))
+    return await asyncio.gather(*tasks)
+
+
+if __name__ == '__main__':
+    while True:
+        offsets = []
+        for _ in range(concurrency):
+            offset += 1
+            offsets.append(offset)
+        if False in asyncio.run(main(offsets)):
+            break
