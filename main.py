@@ -136,7 +136,7 @@ def store_data(items):
             elif field in db_json:
                 row.append(f"'{json.dumps(item[field])}'")
             else:
-                row.append(f"'{str(item[field])}'")
+                row.append("'{0}'".format(str(item[field]).replace("'", "''")))
         all_rows.append(f"({','.join(row)})")
 
     all_rows = ','.join(all_rows)
