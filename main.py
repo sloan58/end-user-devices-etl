@@ -181,7 +181,10 @@ if __name__ == '__main__':
     while True:
         offsets = []
         for _ in range(concurrency):
-            offset += 1
+            if offset == -1:
+                offset += 1
+            else:
+                offset += 1000
             offsets.append(offset)
         if False in asyncio.run(main(offsets)):
             break
