@@ -157,16 +157,19 @@ def store_data(items):
             values ({fields});
         '''.format(**dynamic_content)
 
-    with conn.cursor(as_dict=True) as cursor:
-        try:
-            cursor.execute(statement)
-        except pymssql.InterfaceError as e:
-            print(f'Exception (InterfaceError): {e}', file=sys.stderr)
-            sys.exit()
-        except pymssql.DatabaseError as e:
-            print(f'Exception (DatabaseError): {e}', file=sys.stderr)
-            sys.exit()
+    cursor = conn.cursor(as_dict=True)
 
+    try:
+        cursor.execute(statement)
+    except pymssql.InterfaceError as e:
+        print(f'Exception (InterfaceError): {e}', file=sys.stderr)
+        sys.exit()
+    except pymssql.DatabaseError as e:
+        print(f'Exception (DatabaseError): {e}', file=sys.stderr)
+        sys.exit()
+
+    cursor.close()
+    
     return len(items) == int(page_length)
 
 
