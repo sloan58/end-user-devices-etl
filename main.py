@@ -2,7 +2,6 @@ import json
 import os
 import sys
 
-import _mssql
 import pymssql
 import requests
 from dotenv import load_dotenv
