@@ -186,5 +186,6 @@ if __name__ == '__main__':
             else:
                 offset += 1000
             offsets.append(offset)
+            print(f'Stacking offset {offset}')
         if False in asyncio.run(main(offsets)):
             break
