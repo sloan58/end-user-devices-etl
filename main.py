@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 
 import aiohttp
 import pymssql
@@ -99,13 +100,16 @@ db_fields = [
 
 
 async def call_api(offset):
+    start = time.time()
+    print(f'Offset {offset}: Initiating API Request')
     async with aiohttp.ClientSession() as session:
         url = base_url + f'?offset={offset}&pagelength={page_length}&detail=true&customerid={customer_id}'
         try:
             response = await session.request('GET', url=url, headers=headers)
             data = await response.json()
             response.raise_for_status()
-
+            end = time.time()
+            print(f'Offset {offset}: Received API Response ({str(round(end - start, 2))} seconds)')
             try:
                 items = data['devices']
             except (KeyError, TypeError) as e:
@@ -124,6 +128,8 @@ async def call_api(offset):
 
 
 def store_data(items):
+    start = time.time()
+    print(f'Begin store_data')
     global api_has_more_results
     all_rows = []
     for item in items:
@@ -169,6 +175,8 @@ def store_data(items):
             print(f'Exception (DatabaseError): {e}', file=sys.stderr)
             sys.exit()
 
+    end = time.time()
+    print(f'End store_data ({str(round(end - start, 2))} seconds)')
     return len(items) == int(page_length)
 
 
@@ -188,6 +196,5 @@ if __name__ == '__main__':
             else:
                 offset += 1000
             offsets.append(offset)
-            print(f'Stacking offset {offset}')
         if False in asyncio.run(main(offsets)):
             break
