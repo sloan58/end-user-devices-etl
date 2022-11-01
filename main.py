@@ -158,7 +158,7 @@ def store_data(items):
     }
 
     statement = '''merge [{table}] using (values {all_rows}) [script_source] ({fields})
-            on [script_source].[MAC] = [{table}].[MAC]
+            on [script_source].[deviceid] = [{table}].[deviceid]
             when matched then update set {update_assignments}
             when not matched then insert ({fields})
             values ({fields});
