@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 
 import pymssql
 import pyodbc
@@ -98,8 +99,14 @@ while True:
     url = base_url + f'?offset={offset}&pagelength={page_length}&detail=true&customerid={customer_id}'
 
     try:
+        print(f'Offset {offset}: Calling API')
+        start = time.time()
+
         response = requests.request('GET', url, headers=headers)
         response.raise_for_status()
+
+        end = time.time()
+        print(f'Offset {offset}: Received API Response ({str(round(end - start, 2))} seconds)')
     except requests.exceptions.HTTPError as e:
         print(e, file=sys.stderr)
         sys.exit()
@@ -147,7 +154,13 @@ while True:
 
     with conn.cursor() as cursor:
         try:
+            start = time.time()
+            print(f'Begin store_data')
+
             cursor.execute(statement)
+
+            end = time.time()
+            print(f'End store_data ({str(round(end - start, 2))} seconds)')
         except pymssql.InterfaceError as e:
             print(f'Exception (InterfaceError): {e}', file=sys.stderr)
             sys.exit()
