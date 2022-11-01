@@ -5,6 +5,7 @@ import sys
 
 import aiohttp
 import pymssql
+import pyodbc as pyodbc
 import requests
 from dotenv import load_dotenv
 
@@ -16,7 +17,7 @@ password = os.getenv('PYMSSQL_PASSWORD')
 db = os.getenv('PYMSSQL_DB')
 table = os.getenv('PYMSSQL_TABLE')
 
-conn = pymssql.connect(server, user, password, db, autocommit=True, timeout=10)
+conn = pyodbc.connect('DRIVER={ODBC Driver 18 for SQL Server};SERVER='+server+';DATABASE='+db+';ENCRYPT=no;UID='+user+';PWD='+password)
 
 customer_id = os.getenv('PALO_CUSTOMER_ID')
 page_length = os.getenv('PALO_PAGE_LENGTH')
@@ -157,19 +158,16 @@ def store_data(items):
             values ({fields});
         '''.format(**dynamic_content)
 
-    cursor = conn.cursor(as_dict=True)
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute(statement)
+        except pymssql.InterfaceError as e:
+            print(f'Exception (InterfaceError): {e}', file=sys.stderr)
+            sys.exit()
+        except pymssql.DatabaseError as e:
+            print(f'Exception (DatabaseError): {e}', file=sys.stderr)
+            sys.exit()
 
-    try:
-        cursor.execute(statement)
-    except pymssql.InterfaceError as e:
-        print(f'Exception (InterfaceError): {e}', file=sys.stderr)
-        sys.exit()
-    except pymssql.DatabaseError as e:
-        print(f'Exception (DatabaseError): {e}', file=sys.stderr)
-        sys.exit()
-
-    cursor.close()
-    
     return len(items) == int(page_length)
 
 
