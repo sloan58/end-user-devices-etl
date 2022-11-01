@@ -158,6 +158,7 @@ def store_data(items):
             values ({fields});
         '''.format(**dynamic_content)
 
+    # TODO: Update exceptions for pyodbc
     with conn.cursor() as cursor:
         try:
             cursor.execute(statement)
